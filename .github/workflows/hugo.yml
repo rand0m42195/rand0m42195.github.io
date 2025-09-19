@@ -1,0 +1,38 @@
+name: Build and Deploy Hugo Site
+
+on:
+  push:
+    branches:
+      - main   # 当 main 分支有 push 时触发
+  workflow_dispatch:  # 允许手动触发
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1️⃣ 拉取源码
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # 获取完整历史，避免 push 冲突
+
+      # 2️⃣ 设置 Hugo
+      - name: Setup Hugo
+        uses: peaceiris/actions-hugo@v3
+        with:
+          hugo-version: 'latest'
+          extended: true  # 如果你用到 Sass/SCSS
+
+      # 3️⃣ 构建 Hugo
+      - name: Build Hugo site
+        run: hugo version && hugo --minify
+
+      # 4️⃣ 部署到 gh-pages
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./public
+          publish_branch: gh-pages
+          commit_message: "Automated deploy from main branch"

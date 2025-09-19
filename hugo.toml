@@ -1,0 +1,76 @@
+baseURL = "https://rand0m42195.github.io/"
+title = "rand0m's blog"
+theme = "PaperMod"
+defaultContentLanguage = "zh"
+
+
+# 生成 HTML/JSON 用于 SEO
+enableRobotsTXT = true
+
+# 语法高亮
+pygmentsUseClasses = true
+pygmentsCodeFences = true
+pygmentsCodefencesGuessSyntax = true
+
+[pagination]
+pagerSize = 10
+
+[params]
+env = "production"           # 可设为 "development" 在本地调试
+description = "rand0m 的个人博客"
+author = "rand0m"
+defaultTheme = "auto"        # auto, dark, light
+showReadingTime = true
+showShareButtons = true
+showPostNavLinks = true
+showBreadCrumbs = true
+showCodeCopyButtons = true
+
+# 首页显示模式：Profile 模式
+[params.profileMode]
+enabled = true
+title = "rand0m"
+subtitle = "Programmer | Rust & Go | System Enthusiast"
+imageUrl = "images/avatar.png"                          # 放在 static/images/avatar.png
+imageTitle = "avatar"
+imageWidth = 120
+imageHeight = 120
+
+[[params.profileMode.buttons]]
+name = "文章"
+url = "/posts/"
+
+[[params.profileMode.buttons]]
+name = "关于我"
+url = "/about/"
+
+# 首页显示模式：Home Info（如果不用 Profile，可以改用这个）
+[params.homeInfoParams]
+Title = "欢迎来到 rand0m 的博客 👋"
+Content = "记录学习与思考：Rust、Go、操作系统、eBPF、防火墙、分布式系统。"
+
+# 菜单配置
+[menu]
+
+[[menu.main]]
+identifier = "posts"
+name = "文章"
+url = "/posts/"
+weight = 1
+
+[[menu.main]]
+identifier = "about"
+name = "关于"
+url = "/about/"
+weight = 2
+
+[[menu.main]]
+identifier = "github"
+name = "GitHub"
+url = "https://github.com/rand0m42195"
+weight = 10
+
+# 社交链接（可选）
+[[params.socialIcons]]
+name = "github"
+url = "https://github.com/rand0m42195"
