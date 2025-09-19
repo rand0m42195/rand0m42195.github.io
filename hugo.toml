@@ -74,3 +74,16 @@ weight = 10
 [[params.socialIcons]]
 name = "github"
 url = "https://github.com/rand0m42195"
+
+
+[params.giscus]
+enable = true
+repo = "rand0m42195/rand0m42195.github.io"
+repo-id = "R_kgDOPzDcOw"
+category = "Announcements"
+category-id = "DIC_kwDOPzDcO84CvpUm"
+mapping = "pathname"
+reactions-enabled = true
+emit-metadata = false
+theme = "light"
+dark-theme = "dark"
