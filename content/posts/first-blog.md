@@ -2,6 +2,7 @@
 date = '2025-09-19T17:26:03+08:00'
 draft = false
 title = 'First Blog'
+comments = true
 +++
 
 # 测试
