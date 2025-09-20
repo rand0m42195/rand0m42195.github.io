@@ -20,6 +20,7 @@ env = "production"           # 可设为 "development" 在本地调试
 description = "rand0m 的个人博客"
 author = "rand0m"
 defaultTheme = "auto"        # auto, dark, light
+themeToggle = true
 showReadingTime = true
 showShareButtons = true
 showPostNavLinks = true
