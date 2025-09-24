@@ -4,7 +4,7 @@ draft = false
 title = '网络数据包接受过程分析——从网卡到内核协议栈（以Intel e1000 + Linux 4.4为例）'
 comments = true
 toc = true
-tags = ["Networking", "Linux", "C"]
+tags = ["Networking", "Linux", "Kernel", "C"]
 
 +++
 
