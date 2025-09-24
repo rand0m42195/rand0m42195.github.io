@@ -1,8 +1,6 @@
-<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/"><channel><title>rand0m's blog</title><link>https://rand0m42195.github.io/</link><description>Recent content on rand0m's blog</description><generator>Hugo -- 0.150.0</generator><language>zh</language><lastBuildDate>Tue, 23 Sep 2025 20:43:51 +0800</lastBuildDate><atom:link href="https://rand0m42195.github.io/index.xml" rel="self" type="application/rss+xml"/><item><title>网络数据包接受过程分析——从网卡到内核协议栈（以Intel e1000 + Linux 4.4为例）</title><link>https://rand0m42195.github.io/posts/linux-networking-receive/</link><pubDate>Tue, 23 Sep 2025 20:43:51 +0800</pubDate><guid>https://rand0m42195.github.io/posts/linux-networking-receive/</guid><description>&lt;p&gt;[toc]&lt;/p&gt;
-&lt;h1 id="引言"&gt;引言&lt;/h1&gt;
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/"><channel><title>rand0m's blog</title><link>https://rand0m42195.github.io/</link><description>Recent content on rand0m's blog</description><generator>Hugo -- 0.150.0</generator><language>zh</language><lastBuildDate>Mon, 22 Sep 2025 20:43:51 +0800</lastBuildDate><atom:link href="https://rand0m42195.github.io/index.xml" rel="self" type="application/rss+xml"/><item><title>网络数据包接受过程分析——从网卡到内核协议栈（以Intel e1000 + Linux 4.4为例）</title><link>https://rand0m42195.github.io/posts/linux-networking-receive/</link><pubDate>Mon, 22 Sep 2025 20:43:51 +0800</pubDate><guid>https://rand0m42195.github.io/posts/linux-networking-receive/</guid><description>&lt;h1 id="引言"&gt;引言&lt;/h1&gt;
 &lt;p&gt;网络数据包从网卡到应用程序，需要经历一段复杂的旅程。作为开发者，我们平时调用 &lt;code&gt;socket()&lt;/code&gt;、&lt;code&gt;recv()&lt;/code&gt; 就能轻松拿到数据，却很少思考内核背后究竟发生了什么。&lt;/p&gt;
-&lt;p&gt;本系列文章尝试结合 &lt;strong&gt;理论流程 + 内核源码分析&lt;/strong&gt;，逐步剖析 Linux 内核中网络数据包的接收过程。我们选择 Linux 4.4 内核作为例子（代码相对稳定，资料丰富，逻辑上没有过多新特性干扰），并结合 Intel e1000 驱动来具体展示。&lt;/p&gt;
-&lt;p&gt;目标是让读者能既理解整体原理，又能追踪到具体的源码实现，形成「心中有图，手上有代码」的学习效果。&lt;/p&gt;
+&lt;p&gt;本系列文章尝试结合 &lt;strong&gt;理论流程 + 内核源码分析&lt;/strong&gt;，逐步剖析 Linux 内核中网络数据包的接收过程。这里选择 Linux 4.4 内核作为例子（代码相对稳定，资料丰富，逻辑上没有过多新特性干扰），并结合 Intel e1000 驱动来具体展示数据包是如何从网卡到达内核网络协议栈的。&lt;/p&gt;
 &lt;h1 id="网络数据包接收的总体流程"&gt;网络数据包接收的总体流程&lt;/h1&gt;
 &lt;p&gt;先给出一个全局视角：数据包从网卡到达内存，再到协议栈的路径，大致如下：&lt;/p&gt;
 &lt;ol&gt;
@@ -18,11 +16,8 @@
 CPU 执行 &lt;code&gt;do_softirq()&lt;/code&gt; → &lt;code&gt;net_rx_action()&lt;/code&gt; → 调用 e1000 的 poll 函数。&lt;/li&gt;
 &lt;li&gt;&lt;strong&gt;poll 函数提取数据包并构造 skb&lt;/strong&gt;
 驱动在 poll 中读取 DMA ring 的描述符，把数据包封装进 &lt;code&gt;sk_buff&lt;/code&gt; 结构，交给内核网络子系统。&lt;/li&gt;
-&lt;li&gt;&lt;strong&gt;GRO 合并小包（可选优化）&lt;/strong&gt;
-如果开启了 GRO，内核会尝试合并多个小 TCP 包，减少上层处理开销。&lt;/li&gt;
 &lt;li&gt;&lt;strong&gt;协议栈处理&lt;/strong&gt;
 skb 被送到 IP 层，进一步交给 TCP/UDP，最终到达 socket，供应用程序读取。&lt;/li&gt;
 &lt;/ol&gt;
-&lt;h2 id="e1000-网卡-dma-收包机制"&gt;e1000 网卡 DMA 收包机制&lt;/h2&gt;
-&lt;p&gt;e1000 网卡使用了 &lt;strong&gt;DMA（Direct Memory Access）&lt;/strong&gt;：网卡硬件自己把数据写入内存中的接收缓冲区。那么Linux内核就要告诉网卡在DMA操作的时候把网络数据包copy到内存的哪个位置？这就需要网卡的驱动提前为网卡分配好专门保存数据包的内存，也就是ring buffer。&lt;/p&gt;</description></item><item><title>About</title><link>https://rand0m42195.github.io/about/</link><pubDate>Fri, 19 Sep 2025 17:26:55 +0800</pubDate><guid>https://rand0m42195.github.io/about/</guid><description>&lt;p&gt;一枚程序员，编程语言：&lt;code&gt;C&lt;/code&gt;/&lt;code&gt;Go&lt;/code&gt;/&lt;code&gt;Rust&lt;/code&gt;，喜欢了解操作系统原理、编译原理，喜欢阅读和跑步。&lt;/p&gt;</description></item><item><title>First Blog</title><link>https://rand0m42195.github.io/posts/first-blog/</link><pubDate>Fri, 19 Sep 2025 17:26:03 +0800</pubDate><guid>https://rand0m42195.github.io/posts/first-blog/</guid><description>&lt;h1 id="测试"&gt;测试&lt;/h1&gt;
+&lt;p&gt;&lt;img alt="网卡收包流程" loading="lazy" src="https://rand0m42195.github.io/images/posts/linux-networking-receive/nic-networking-stack.png"&gt;&lt;/p&gt;</description></item><item><title>About</title><link>https://rand0m42195.github.io/about/</link><pubDate>Fri, 19 Sep 2025 17:26:55 +0800</pubDate><guid>https://rand0m42195.github.io/about/</guid><description>&lt;p&gt;一枚程序员，编程语言：&lt;code&gt;C&lt;/code&gt;/&lt;code&gt;Go&lt;/code&gt;/&lt;code&gt;Rust&lt;/code&gt;，喜欢了解操作系统原理、编译原理，喜欢阅读和跑步。&lt;/p&gt;</description></item><item><title>First Blog</title><link>https://rand0m42195.github.io/posts/first-blog/</link><pubDate>Fri, 19 Sep 2025 17:26:03 +0800</pubDate><guid>https://rand0m42195.github.io/posts/first-blog/</guid><description>&lt;h1 id="测试"&gt;测试&lt;/h1&gt;
 &lt;p&gt;这是第一篇博客！&lt;/p&gt;</description></item></channel></rss>
