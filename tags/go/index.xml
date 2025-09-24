@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/"><channel><title>C on rand0m's blog</title><link>https://rand0m42195.github.io/tags/c/</link><description>Recent content in C on rand0m's blog</description><generator>Hugo -- 0.150.0</generator><language>zh</language><lastBuildDate>Wed, 24 Sep 2025 15:06:05 +0800</lastBuildDate><atom:link href="https://rand0m42195.github.io/tags/c/index.xml" rel="self" type="application/rss+xml"/><item><title>Linux 网络编程——socket 系统调用实现剖析</title><link>https://rand0m42195.github.io/posts/linux-networking-socket-syscall/</link><pubDate>Wed, 24 Sep 2025 15:06:05 +0800</pubDate><guid>https://rand0m42195.github.io/posts/linux-networking-socket-syscall/</guid><description>&lt;h1 id="linux-下多语言网络编程对比"&gt;Linux 下多语言网络编程对比&lt;/h1&gt;
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/"><channel><title>Go on rand0m's blog</title><link>https://rand0m42195.github.io/tags/go/</link><description>Recent content in Go on rand0m's blog</description><generator>Hugo -- 0.150.0</generator><language>zh</language><lastBuildDate>Wed, 24 Sep 2025 15:06:05 +0800</lastBuildDate><atom:link href="https://rand0m42195.github.io/tags/go/index.xml" rel="self" type="application/rss+xml"/><item><title>Linux 网络编程——socket 系统调用实现剖析</title><link>https://rand0m42195.github.io/posts/linux-networking-socket-syscall/</link><pubDate>Wed, 24 Sep 2025 15:06:05 +0800</pubDate><guid>https://rand0m42195.github.io/posts/linux-networking-socket-syscall/</guid><description>&lt;h1 id="linux-下多语言网络编程对比"&gt;Linux 下多语言网络编程对比&lt;/h1&gt;
 &lt;p&gt;还记得Linux网络编程姿势吗？如果不记得了，这里有一个用C语言写的&lt;code&gt;tcp_echo&lt;/code&gt;服务，用这段代码能帮我们回忆Linux的网络编程套路：&lt;/p&gt;
 &lt;ol&gt;
 &lt;li&gt;调用socket创建一个网络套接字socket；&lt;/li&gt;
@@ -39,25 +39,4 @@
 &lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;return&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;0&lt;/span&gt;;
 &lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}
 &lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;如果你用的是Go、Python、Rust等高级编程语言，可能会对这段代码嗤之以鼻，这么简单一个功能，要创建一个可以通信的TCP连接完全不必这么复杂。&lt;/p&gt;
-&lt;p&gt;这是用&lt;code&gt;Go&lt;/code&gt;写的，如果不考虑错误处理，只需要调用&lt;code&gt;Listen&lt;/code&gt;和&lt;code&gt;Accept&lt;/code&gt;。&lt;/p&gt;</description></item><item><title>网络数据包接受过程分析——从网卡到内核协议栈（以Intel e1000 + Linux 4.4为例）</title><link>https://rand0m42195.github.io/posts/linux-networking-receive/</link><pubDate>Mon, 22 Sep 2025 20:43:51 +0800</pubDate><guid>https://rand0m42195.github.io/posts/linux-networking-receive/</guid><description>&lt;h1 id="引言"&gt;引言&lt;/h1&gt;
-&lt;p&gt;网络数据包从网卡到应用程序，需要经历一段复杂的旅程。作为开发者，我们平时调用 &lt;code&gt;socket()&lt;/code&gt;、&lt;code&gt;recv()&lt;/code&gt; 就能轻松拿到数据，却很少思考内核背后究竟发生了什么。&lt;/p&gt;
-&lt;p&gt;本系列文章尝试结合 &lt;strong&gt;理论流程 + 内核源码分析&lt;/strong&gt;，逐步剖析 Linux 内核中网络数据包的接收过程。这里选择 Linux 4.4 内核作为例子（代码相对稳定，资料丰富，逻辑上没有过多新特性干扰），并结合 Intel e1000 驱动来具体展示数据包是如何从网卡到达内核网络协议栈的。&lt;/p&gt;
-&lt;h1 id="网络数据包接收的总体流程"&gt;网络数据包接收的总体流程&lt;/h1&gt;
-&lt;p&gt;先给出一个全局视角：数据包从网卡到达内存，再到协议栈的路径，大致如下：&lt;/p&gt;
-&lt;ol&gt;
-&lt;li&gt;&lt;strong&gt;数据包到达网卡&lt;/strong&gt;
-网卡硬件接收以太帧，做基本校验（如 CRC）。&lt;/li&gt;
-&lt;li&gt;&lt;strong&gt;DMA 写入内存&lt;/strong&gt;
-网卡通过 DMA 将数据包写入驱动预先分配好的接收缓冲区（Descriptor Ring）。&lt;/li&gt;
-&lt;li&gt;&lt;strong&gt;中断通知 CPU&lt;/strong&gt;
-网卡通过 IRQ 告诉 CPU：“我收到了新数据包”。&lt;/li&gt;
-&lt;li&gt;&lt;strong&gt;驱动中断处理函数（ISR）&lt;/strong&gt;
-驱动快速处理中断，通常只是调用 &lt;code&gt;__napi_schedule()&lt;/code&gt;，把 NAPI poll 加入调度队列。&lt;/li&gt;
-&lt;li&gt;&lt;strong&gt;软中断调度 NAPI poll&lt;/strong&gt;
-CPU 执行 &lt;code&gt;do_softirq()&lt;/code&gt; → &lt;code&gt;net_rx_action()&lt;/code&gt; → 调用 e1000 的 poll 函数。&lt;/li&gt;
-&lt;li&gt;&lt;strong&gt;poll 函数提取数据包并构造 skb&lt;/strong&gt;
-驱动在 poll 中读取 DMA ring 的描述符，把数据包封装进 &lt;code&gt;sk_buff&lt;/code&gt; 结构，交给内核网络子系统。&lt;/li&gt;
-&lt;li&gt;&lt;strong&gt;协议栈处理&lt;/strong&gt;
-skb 被送到 IP 层，进一步交给 TCP/UDP，最终到达 socket，供应用程序读取。&lt;/li&gt;
-&lt;/ol&gt;
-&lt;p&gt;&lt;img alt="网卡收包流程" loading="lazy" src="https://rand0m42195.github.io/images/posts/linux-networking-receive/nic-networking-stack.png"&gt;&lt;/p&gt;</description></item></channel></rss>
+&lt;p&gt;这是用&lt;code&gt;Go&lt;/code&gt;写的，如果不考虑错误处理，只需要调用&lt;code&gt;Listen&lt;/code&gt;和&lt;code&gt;Accept&lt;/code&gt;。&lt;/p&gt;</description></item></channel></rss>

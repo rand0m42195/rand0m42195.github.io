@@ -1,4 +1,45 @@
-<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/"><channel><title>Linux on rand0m's blog</title><link>https://rand0m42195.github.io/tags/linux/</link><description>Recent content in Linux on rand0m's blog</description><generator>Hugo -- 0.150.0</generator><language>zh</language><lastBuildDate>Mon, 22 Sep 2025 20:43:51 +0800</lastBuildDate><atom:link href="https://rand0m42195.github.io/tags/linux/index.xml" rel="self" type="application/rss+xml"/><item><title>网络数据包接受过程分析——从网卡到内核协议栈（以Intel e1000 + Linux 4.4为例）</title><link>https://rand0m42195.github.io/posts/linux-networking-receive/</link><pubDate>Mon, 22 Sep 2025 20:43:51 +0800</pubDate><guid>https://rand0m42195.github.io/posts/linux-networking-receive/</guid><description>&lt;h1 id="引言"&gt;引言&lt;/h1&gt;
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/"><channel><title>Linux on rand0m's blog</title><link>https://rand0m42195.github.io/tags/linux/</link><description>Recent content in Linux on rand0m's blog</description><generator>Hugo -- 0.150.0</generator><language>zh</language><lastBuildDate>Wed, 24 Sep 2025 15:06:05 +0800</lastBuildDate><atom:link href="https://rand0m42195.github.io/tags/linux/index.xml" rel="self" type="application/rss+xml"/><item><title>Linux 网络编程——socket 系统调用实现剖析</title><link>https://rand0m42195.github.io/posts/linux-networking-socket-syscall/</link><pubDate>Wed, 24 Sep 2025 15:06:05 +0800</pubDate><guid>https://rand0m42195.github.io/posts/linux-networking-socket-syscall/</guid><description>&lt;h1 id="linux-下多语言网络编程对比"&gt;Linux 下多语言网络编程对比&lt;/h1&gt;
+&lt;p&gt;还记得Linux网络编程姿势吗？如果不记得了，这里有一个用C语言写的&lt;code&gt;tcp_echo&lt;/code&gt;服务，用这段代码能帮我们回忆Linux的网络编程套路：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;调用socket创建一个网络套接字socket；&lt;/li&gt;
+&lt;li&gt;调用bind给socket绑定地址；&lt;/li&gt;
+&lt;li&gt;listen设置&lt;/li&gt;
+&lt;li&gt;调用accept接收网络请求；&lt;/li&gt;
+&lt;/ol&gt;
+&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"&gt;&lt;code class="language-C" data-lang="C"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;#include&lt;/span&gt; &lt;span style="color:#75715e"&gt;&amp;lt;stdio.h&amp;gt;&lt;/span&gt;&lt;span style="color:#75715e"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;#include&lt;/span&gt; &lt;span style="color:#75715e"&gt;&amp;lt;stdlib.h&amp;gt;&lt;/span&gt;&lt;span style="color:#75715e"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;#include&lt;/span&gt; &lt;span style="color:#75715e"&gt;&amp;lt;string.h&amp;gt;&lt;/span&gt;&lt;span style="color:#75715e"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;#include&lt;/span&gt; &lt;span style="color:#75715e"&gt;&amp;lt;unistd.h&amp;gt;&lt;/span&gt;&lt;span style="color:#75715e"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;#include&lt;/span&gt; &lt;span style="color:#75715e"&gt;&amp;lt;arpa/inet.h&amp;gt;&lt;/span&gt;&lt;span style="color:#75715e"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;#include&lt;/span&gt; &lt;span style="color:#75715e"&gt;&amp;lt;sys/socket.h&amp;gt;&lt;/span&gt;&lt;span style="color:#75715e"&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#66d9ef"&gt;int&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;main&lt;/span&gt;(&lt;span style="color:#66d9ef"&gt;void&lt;/span&gt;) {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;int&lt;/span&gt; sd &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;socket&lt;/span&gt;(AF_INET, SOCK_STREAM, &lt;span style="color:#ae81ff"&gt;0&lt;/span&gt;);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;struct&lt;/span&gt; sockaddr_in addr &lt;span style="color:#f92672"&gt;=&lt;/span&gt; {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; .sin_family &lt;span style="color:#f92672"&gt;=&lt;/span&gt; AF_INET,
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; .sin_port &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;htons&lt;/span&gt;(&lt;span style="color:#ae81ff"&gt;12345&lt;/span&gt;),
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; .sin_addr.s_addr &lt;span style="color:#f92672"&gt;=&lt;/span&gt; INADDR_ANY,
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; };
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#a6e22e"&gt;bind&lt;/span&gt;(sd, (&lt;span style="color:#66d9ef"&gt;struct&lt;/span&gt; sockaddr&lt;span style="color:#f92672"&gt;*&lt;/span&gt;)&lt;span style="color:#f92672"&gt;&amp;amp;&lt;/span&gt;addr, &lt;span style="color:#66d9ef"&gt;sizeof&lt;/span&gt;(addr));
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#a6e22e"&gt;listen&lt;/span&gt;(sd, &lt;span style="color:#ae81ff"&gt;5&lt;/span&gt;);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;while&lt;/span&gt; (&lt;span style="color:#ae81ff"&gt;1&lt;/span&gt;) {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;int&lt;/span&gt; client &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;accept&lt;/span&gt;(sd, NULL, NULL);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;char&lt;/span&gt; buf[&lt;span style="color:#ae81ff"&gt;1024&lt;/span&gt;];
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;ssize_t&lt;/span&gt; n;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;while&lt;/span&gt; ((n &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#a6e22e"&gt;recv&lt;/span&gt;(client, buf, &lt;span style="color:#66d9ef"&gt;sizeof&lt;/span&gt;(buf), &lt;span style="color:#ae81ff"&gt;0&lt;/span&gt;)) &lt;span style="color:#f92672"&gt;&amp;gt;&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;0&lt;/span&gt;) {
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#a6e22e"&gt;send&lt;/span&gt;(client, buf, n, &lt;span style="color:#ae81ff"&gt;0&lt;/span&gt;); &lt;span style="color:#75715e"&gt;// 把读到的内容发送回去
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;&lt;/span&gt; }
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#a6e22e"&gt;close&lt;/span&gt;(client);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; }
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#a6e22e"&gt;close&lt;/span&gt;(sd);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt; &lt;span style="color:#66d9ef"&gt;return&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;0&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;}
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;如果你用的是Go、Python、Rust等高级编程语言，可能会对这段代码嗤之以鼻，这么简单一个功能，要创建一个可以通信的TCP连接完全不必这么复杂。&lt;/p&gt;
+&lt;p&gt;这是用&lt;code&gt;Go&lt;/code&gt;写的，如果不考虑错误处理，只需要调用&lt;code&gt;Listen&lt;/code&gt;和&lt;code&gt;Accept&lt;/code&gt;。&lt;/p&gt;</description></item><item><title>网络数据包接受过程分析——从网卡到内核协议栈（以Intel e1000 + Linux 4.4为例）</title><link>https://rand0m42195.github.io/posts/linux-networking-receive/</link><pubDate>Mon, 22 Sep 2025 20:43:51 +0800</pubDate><guid>https://rand0m42195.github.io/posts/linux-networking-receive/</guid><description>&lt;h1 id="引言"&gt;引言&lt;/h1&gt;
 &lt;p&gt;网络数据包从网卡到应用程序，需要经历一段复杂的旅程。作为开发者，我们平时调用 &lt;code&gt;socket()&lt;/code&gt;、&lt;code&gt;recv()&lt;/code&gt; 就能轻松拿到数据，却很少思考内核背后究竟发生了什么。&lt;/p&gt;
 &lt;p&gt;本系列文章尝试结合 &lt;strong&gt;理论流程 + 内核源码分析&lt;/strong&gt;，逐步剖析 Linux 内核中网络数据包的接收过程。这里选择 Linux 4.4 内核作为例子（代码相对稳定，资料丰富，逻辑上没有过多新特性干扰），并结合 Intel e1000 驱动来具体展示数据包是如何从网卡到达内核网络协议栈的。&lt;/p&gt;
 &lt;h1 id="网络数据包接收的总体流程"&gt;网络数据包接收的总体流程&lt;/h1&gt;
