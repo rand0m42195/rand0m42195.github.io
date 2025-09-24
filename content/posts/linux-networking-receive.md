@@ -1,24 +1,20 @@
 +++
-date = '2025-09-23T20:43:51+08:00'
+date = '2025-09-22T20:43:51+08:00'
 draft = false
 title = '网络数据包接受过程分析——从网卡到内核协议栈（以Intel e1000 + Linux 4.4为例）'
-
 comments = true
+toc = true
 tags = ["Networking", "Linux", "C"]
 
 +++
 
-[toc]
+
 
 # 引言
 
 网络数据包从网卡到应用程序，需要经历一段复杂的旅程。作为开发者，我们平时调用 `socket()`、`recv()` 就能轻松拿到数据，却很少思考内核背后究竟发生了什么。
 
-本系列文章尝试结合 **理论流程 + 内核源码分析**，逐步剖析 Linux 内核中网络数据包的接收过程。我们选择 Linux 4.4 内核作为例子（代码相对稳定，资料丰富，逻辑上没有过多新特性干扰），并结合 Intel e1000 驱动来具体展示。
-
-目标是让读者能既理解整体原理，又能追踪到具体的源码实现，形成「心中有图，手上有代码」的学习效果。
-
-
+本系列文章尝试结合 **理论流程 + 内核源码分析**，逐步剖析 Linux 内核中网络数据包的接收过程。这里选择 Linux 4.4 内核作为例子（代码相对稳定，资料丰富，逻辑上没有过多新特性干扰），并结合 Intel e1000 驱动来具体展示数据包是如何从网卡到达内核网络协议栈的。
 
 # 网络数据包接收的总体流程
 
@@ -36,10 +32,16 @@ tags = ["Networking", "Linux", "C"]
     CPU 执行 `do_softirq()` → `net_rx_action()` → 调用 e1000 的 poll 函数。
 6. **poll 函数提取数据包并构造 skb**
     驱动在 poll 中读取 DMA ring 的描述符，把数据包封装进 `sk_buff` 结构，交给内核网络子系统。
-7. **GRO 合并小包（可选优化）**
-    如果开启了 GRO，内核会尝试合并多个小 TCP 包，减少上层处理开销。
-8. **协议栈处理**
+7. **协议栈处理**
     skb 被送到 IP 层，进一步交给 TCP/UDP，最终到达 socket，供应用程序读取。
+
+![网卡收包流程](/images/posts/linux-networking-receive/nic-networking-stack.png)
+
+
+
+在开始具体分析之前，先说以下相关源码的位置。和网卡相关的代码在驱动目录下（`/drivers/net/ethernet`），由于我们分析的是Intel的e1000网卡，所以具体位置就是`/drivers/net/ethernet/intel/e1000`，内核网络协议栈位于网络子系统目录下`/net`，主要是`/net/core/`目录，我们主要分析IPv4，所以还会涉及`/net/ipv4/`中的少量代码。
+
+接下来就以Intel e1000网卡为例，来一起探究网卡收包过程吧😀
 
 
 
@@ -600,6 +602,8 @@ gro_result_t napi_gro_receive(struct napi_struct *napi, struct sk_buff *skb)
 EXPORT_SYMBOL(napi_gro_receive);
 ```
 
+
+
 `__netif_receive_skb_core`比较长，以下是保留了skb分发逻辑的简化版本。主要流程如下：
 
 1. 先分发给全局链表 `ptype_all`（tcpdump 等监听工具会在这里收到数据包）。
@@ -680,7 +684,9 @@ static int __netif_receive_skb_core(struct sk_buff *skb)
 }
 ```
 
-如何确定把数据包分发给谁处理呢？对于IPv4数据包而言，e1000网卡在将skb交给`napi_gro_receive`之前，会设置`skb->protocol`，`__netif_receive_skb_core`在分发的时候会在ptype_base中查找匹配的处理函数，对于IPv4而言，在初始化的时候会将`ip_packet_type`添加到`ptype_base`中。
+这里插播一段内容：tcpdump的抓包的实现原理其实就是创建`PF_PACKET`类型的socket并添加到`ptype_all`或者`dev->ptype_all`，而每一个数据包都会经历前面的1、2两个分发过程。可以看到tcpdump的抓包位置在数据包处理的早期（入向流量），所以即使数据包会被丢弃，tcpdump也能抓到完整的数据包。
+
+如何确定把数据包分发给谁处理呢？对于IPv4数据包而言，e1000网卡在将skb交给`napi_gro_receive`前，会设置`skb->protocol`，`__netif_receive_skb_core`在分发的时候会在ptype_base中查找匹配的处理函数，对于IPv4而言，在初始化的时候会将`ip_packet_type`添加到`ptype_base`中。
 
 ```C
 // file: net/ipv4/af_inet.c
@@ -698,3 +704,8 @@ static int __init inet_init(void)
 
 ```
 
+
+
+# 总结
+
+经过一通分析，终于把数据包从网卡送到了内核网络协议栈，还意外的发现了tcpdump抓包的位置（入向包），真不容易。回过头来再看这个过程，你会发现数据包的接收过程基本都是在软中断上下文中处理的，而且主要是操作skb这个结构体。数据包达到内核协议栈之后是如何被处理并最终交给用户态程序的呢？这个留在下一篇文章讲解。
