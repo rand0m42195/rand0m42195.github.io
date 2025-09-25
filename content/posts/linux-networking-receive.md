@@ -3,7 +3,6 @@ date = '2025-09-22T20:43:51+08:00'
 draft = false
 title = '网络数据包接受过程分析——从网卡到内核协议栈（以Intel e1000 + Linux 4.4为例）'
 comments = true
-toc = true
 tags = ["Networking", "Linux", "Kernel", "C"]
 
 +++
@@ -32,8 +31,8 @@ tags = ["Networking", "Linux", "Kernel", "C"]
     CPU 执行 `do_softirq()` → `net_rx_action()` → 调用 e1000 的 poll 函数。
 6. **poll 函数提取数据包并构造 skb**
     驱动在 poll 中读取 DMA ring 的描述符，把数据包封装进 `sk_buff` 结构，交给内核网络子系统。
-7. **协议栈处理**
-    skb 被送到 IP 层，进一步交给 TCP/UDP，最终到达 socket，供应用程序读取。
+7. **网络核心层处理**
+    skb 被送到网络核心层，核心层通过数据包的协议类型选择对应的网络协议栈，如IP协议栈，至此网络数据包从网卡到达了Linux内核的网络协议栈。
 
 ![网卡收包流程](/images/posts/linux-networking-receive/nic-networking-stack.png)
 
