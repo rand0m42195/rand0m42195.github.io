@@ -201,7 +201,15 @@ EXPORT_SYMBOL(napi_gro_receive);
 
 
 
-通过上面的调用链可以看到`do_xdp_generic()`是被[`__netif_receive_skb_core()`](https://elixir.bootlin.com/linux/v5.10.244/source/net/core/dev.c#L5183)调用的。在这个函数中，不仅能看到Generic模式的XDP程序被调用，还能看到tcpdump的抓包点以及如何将数据包分发给IP层处理。从`__netif_receive_skb_core()`函数可以看到先调用Generic模式的XDP程序，然后才到tcpdump的抓包点，最后按照协议类型将数据包分发到对应的协议栈处理。所以如果是在XDP程序中返回`XDP_DROP`，那么tcpdump就抓不到这个包了。
+通过上面的调用链可以看到`do_xdp_generic()`是被[`__netif_receive_skb_core()`](https://elixir.bootlin.com/linux/v5.10.244/source/net/core/dev.c#L5183)调用的。`__netif_receive_skb_core()`干了很多事情，包括：
+
+* 执行*Generic* `XDP`程序；
+* 执行*tcpdump*抓包指令；
+* 执行挂载在*tc ingress*上的程序；
+* 执行挂载在*netfilter ingress*上的程序；
+* 分发给对应的网络协议栈；
+
+从这个函数可以清晰的看到XDP、tcpdump、tc ingress、netfilter和网络协议栈的顺序关系。
 
 ```C
 static int __netif_receive_skb_core(struct sk_buff **pskb, bool pfmemalloc,
@@ -209,7 +217,7 @@ static int __netif_receive_skb_core(struct sk_buff **pskb, bool pfmemalloc,
 {
 
 	if (static_branch_unlikely(&generic_xdp_needed_key)) {
-		// Generic model XDP program执行点
+		// Generic model XDP program执行点!!!
 		ret2 = do_xdp_generic(rcu_dereference(skb->dev->xdp_prog), skb);
 		if (ret2 != XDP_PASS) {
 			ret = NET_RX_DROP;
@@ -229,6 +237,22 @@ static int __netif_receive_skb_core(struct sk_buff **pskb, bool pfmemalloc,
 			ret = deliver_skb(skb, pt_prev, orig_dev);
 		pt_prev = ptype;
 	}
+    
+#ifdef CONFIG_NET_INGRESS
+	if (static_branch_unlikely(&ingress_needed_key)) {
+		bool another = false;
+		// tc ingress执行点
+		skb = sch_handle_ingress(skb, &pt_prev, &ret, orig_dev,
+					 &another);
+		if (another)
+			goto another_round;
+		if (!skb)
+			goto out;
+		// netfilter ingress执行点
+		if (nf_ingress(skb, &pt_prev, &ret, orig_dev) < 0)
+			goto out;
+	}
+#endif
 
 	// ......
 
