@@ -158,16 +158,16 @@ async fn main() {
 
 
 
-## `socket` 系统调用实现剖析
+## `socket()` 系统调用实现剖析
 
 **说明**：以下分析使用的Linux内核源码版本为[v4.4.302](https://elixir.bootlin.com/linux/v4.4.302/source/)。
 
 
 
-`socket`系统调用的实现在[net/socket.c](https://elixir.bootlin.com/linux/v4.4.302/source/net/socket.c#L1202)中，`socket`中最关键的动作有两步：
+`socket()`系统调用的实现在[net/socket.c](https://elixir.bootlin.com/linux/v4.4.302/source/net/socket.c#L1202)中，`socket()`中最关键的动作有两步：
 
-* 调用`sock_create`创建socket对象；
-* 调用`sock_map_fd`将sock映射成fd（用于返回给用户态代码）；
+* 调用`sock_create()`创建内核*socket对象*；
+* 调用`sock_map_fd()`将*socket对象*映射成fd（用于返回给用户态代码）；
 
 ```C
 SYSCALL_DEFINE3(socket, int, family, int, type, int, protocol)
@@ -176,24 +176,45 @@ SYSCALL_DEFINE3(socket, int, family, int, type, int, protocol)
 	struct socket *sock;
 	int flags;
 
-	// ......
+	/* Check the SOCK_* constants for consistency.  */
+	BUILD_BUG_ON(SOCK_CLOEXEC != O_CLOEXEC);
+	BUILD_BUG_ON((SOCK_MAX | SOCK_TYPE_MASK) != SOCK_TYPE_MASK);
+	BUILD_BUG_ON(SOCK_CLOEXEC & SOCK_TYPE_MASK);
+	BUILD_BUG_ON(SOCK_NONBLOCK & SOCK_TYPE_MASK);
 
+    // 检查、处理参数
+	flags = type & ~SOCK_TYPE_MASK;
+	if (flags & ~(SOCK_CLOEXEC | SOCK_NONBLOCK))
+		return -EINVAL;
+	type &= SOCK_TYPE_MASK;
+
+	if (SOCK_NONBLOCK != O_NONBLOCK && (flags & SOCK_NONBLOCK))
+		flags = (flags & ~SOCK_NONBLOCK) | O_NONBLOCK;
+
+    // 创建socket对象
 	retval = sock_create(family, type, protocol, &sock);
 	if (retval < 0)
 		goto out;
-
+	// 为socket对象分配fd
 	retval = sock_map_fd(sock, flags & (O_CLOEXEC | O_NONBLOCK));
-	// ......
+	if (retval < 0)
+		goto out_release;
 
+out:
+	/* It may be already another descriptor 8) Not kernel problem. */
+	return retval;
+
+out_release:
+	sock_release(sock);
 	return retval;
 }
 ```
 
-从socket系统调用的实现可以看到：`socket`把接收的三个参数（`family`，`type`，`protocol`）全都传递给了`sock_create`，另外还把sock指针的地址也传进入了，如果`sock_create`成功创建了socket对象，就会把sock指针指向这个对象，只需要给socket函数返回一个表示是否出错的整数值即可。
+从`socket()`系统调用的实现可以看到：`socket()`把接收的三个参数（`family`，`type`，`protocol`）全都传递给了`sock_create()`，另外还把保存*socket对象*地址的指针`sock`的地址也传进入了，如果`sock_create()`成功创建了*socket对象*，它就会把`sock`指针指向这个对象，只需要给`socket()`返回一个表示是否出错的整数值即可。
 
 ### sock_create分析
 
-下面就看看`sock_create`的[实现](https://elixir.bootlin.com/linux/v4.4.302/source/net/socket.c#L1190)，可以发现sock_create又加了一个参数，然后调用`__sock_create`。这里添加的第一个参数表示**当前进程所在的网络命名空间**（`current`指向当前进程`task_struct`，`current->nsproxy->net_ns`就是当前进程所在的网络命名空间），这个可以用来做*网络隔离*，如*docker*、*ip netns*就会用到这个。但是网络命名空间这个参数不能通过调用函数来传递，而是直接取自当前进程所处的命名空间，所以如果在某个网络命名空间创建socket，需要在调用`socket`之前先调用`setns`切换到目标命名空间，在socket返回之后，可以再切换到其他命名空间，此时创建的socket已经和目标socket绑定了，无论进程在哪个网络命名空间，都不会影响socket收发数据包。
+下面就看看`sock_create()`的[实现](https://elixir.bootlin.com/linux/v4.4.302/source/net/socket.c#L1190)，可以发现`sock_create()`又加了一个参数，然后调用`__sock_create()`。这里添加的第一个参数表示**当前进程所在的网络命名空间**（`current`指向当前进程`task_struct`，`current->nsproxy->net_ns`就是当前进程所在的网络命名空间），这个可以用来做*网络隔离*，如*docker*、*ip netns*就会用到这个。网络命名空间这个参数**不能**通过调用方通过参数来指定，而是直接取自当前进程所处的命名空间，所以如果在某个网络命名空间创建socket，需要在调用`socket`之前先调用`setns`切换到目标命名空间，在socket返回之后，可以再切换到其他命名空间，此时创建的socket已经和目标socket绑定了，无论进程在哪个网络命名空间，都不会影响socket收发数据包。
 
 ```C
 int sock_create(int family, int type, int protocol, struct socket **res)
@@ -205,11 +226,11 @@ EXPORT_SYMBOL(sock_create);
 
 
 
-[`__sock_create`](https://elixir.bootlin.com/linux/v4.4.302/source/net/socket.c#L1077)函数比较长，在研究原理的时候，我们把源码中参数检查、安全及返回值检查相关的代码删掉，只留下关键部分，就得到了下面的代码。可以看到主要分为：
+[`__sock_create()`](https://elixir.bootlin.com/linux/v4.4.302/source/net/socket.c#L1077)函数比较长，在研究原理的时候，我们把源码中参数检查、安全及返回值检查相关的代码删掉，只留下关键部分，就得到了下面的代码。可以看到主要分为：
 
-* 调用`sock_alloc`创建一个`socket`对象；
+* 调用`sock_alloc()`创建一个*socket对象*；
 * 根据`family`参数确定具体的协议族；
-* 调用具体的协议族的`create`函数；
+* 调用具体的协议族的`create()`函数；
 
 ```C
 int __sock_create(struct net *net, int family, int type, int protocol,
@@ -234,7 +255,7 @@ int __sock_create(struct net *net, int family, int type, int protocol,
 EXPORT_SYMBOL(__sock_create);
 ```
 
-我们调用socket函数的时候，传入的family是AF_INET，这个family对应的协议族是什么呢？其实就是`inet_family_ops`，这是[`inet_init`](https://elixir.bootlin.com/linux/v4.4.302/source/net/ipv4/af_inet.c#L1731)注册的。从`__sock_create`中看到会调用对应协议族的create函数，对于`inet_family_ops`而言，create函数就是`inet_create`。
+我们调用`socket()`的时候，传入的`family`是*AF_INET*，这个`family`对应的协议族是什么呢？其实就是`inet_family_ops`，这是[`inet_init`](https://elixir.bootlin.com/linux/v4.4.302/source/net/ipv4/af_inet.c#L1731)注册的。从`__sock_create()`中看到会调用对应协议族的`create()`函数，对于`inet_family_ops`而言，create函数就是`inet_create()`。
 
 ```C
 static const struct net_proto_family inet_family_ops = {
@@ -245,17 +266,6 @@ static const struct net_proto_family inet_family_ops = {
 
 static int __init inet_init(void)
 {
-	struct inet_protosw *q;
-	struct list_head *r;
-	int rc = -EINVAL;
-
-	sock_skb_cb_check_size(sizeof(struct inet_skb_parm));
-
-	rc = proto_register(&tcp_prot, 1);	// 注册tcp
-	rc = proto_register(&udp_prot, 1);	// 注册udp
-	rc = proto_register(&raw_prot, 1);	// 注册raw
-	rc = proto_register(&ping_prot, 1);	// 注册ping
-
 	(void)sock_register(&inet_family_ops);	// 注册协议族
     
     // 初始化inetsw列表
@@ -269,7 +279,7 @@ static int __init inet_init(void)
 }
 ```
 
-下面就来分析[`inet_create`](https://elixir.bootlin.com/linux/v4.4.302/source/net/ipv4/af_inet.c#L249)干了啥。inet_create主要逻辑是根据`socket`系统调用的第二个参数`type`和第三个参数`protocol`来确定具体的传输层（如TCP、UDP、ICMP、RAW）的`inet_protosw`对象。并创建传输层的`sock`对象，最终将`inet_protosw`的操作和`socket`对象关联，以及`socket`对象和`sock`对象相互关联。
+下面就来分析[`inet_create()`](https://elixir.bootlin.com/linux/v4.4.302/source/net/ipv4/af_inet.c#L249)干了啥。`inet_create()`主要逻辑是根据`socket()`系统调用的第二个参数`type`和第三个参数`protocol`来确定具体的传输层（如TCP、UDP、ICMP、RAW）的`inet_protosw`对象。并创建**传输层**的*sock对象*，最终将`inet_protosw()`的操作和*socket对象*关联，并将*socket对象*（struct socket）和传输层*sock对象*（struct sock）相互绑定。
 
 ```C
 static int inet_create(struct net *net, struct socket *sock, int protocol,
@@ -342,12 +352,11 @@ lookup_protocol:
 out:
 	return err;
 }
-
 ```
 
 
 
-[`sock_init_data`](https://elixir.bootlin.com/linux/v4.4.302/source/net/core/sock.c#L2407)的作用是对sock对象的成员初始化，如状态（sk_state）、收发缓冲区大小（sk_sndbuf、sk_rcvbuf）等，以及将内核的socket对象（struct socket）和传输层的sock对象（struct sock）相互关联。
+[`sock_init_data()`](https://elixir.bootlin.com/linux/v4.4.302/source/net/core/sock.c#L2407)的作用是对传输层*sock对象*的成员初始化，如状态（sk_state）、收发缓冲区大小（sk_sndbuf、sk_rcvbuf）等，以及将*socket对象*和传输层的*sock对象*相互关联。
 
 ```C
 void sock_init_data(struct socket *sock, struct sock *sk)
@@ -381,13 +390,13 @@ void sock_init_data(struct socket *sock, struct sock *sk)
 EXPORT_SYMBOL(sock_init_data);
 ```
 
-至此，我们分析完了内核的socket对象的初始化过程。大概思路是：先根据socket系统调用的第一个参数family找到`net_proto_family`对象，调用这个对象的`create`函数。而`net_proto_family`的`create`函数再根据`socket`系统调用的第二、三个参数*type*和*protocol*来确定具体的传输层，然后把传输层的一些操作和socket对象关联，另外还创建了一个传输层的*sock*对象也和*socket*对象关联起来。至此一个*socket*对象就算创建并初始化完成。
+至此，我们分析完了*socket对象*的初始化过程。大概思路是：先根据`socket()`系统调用的第一个参数`family`找到`net_proto_family`对象，调用这个对象的`create()`函数。而`net_proto_family`的`create()`函数再根据`socket()`系统调用的第二、三个参数`type`和`protocol`来确定具体的传输层，然后把传输层的一些操作和*socket对象*关联，另外还创建了一个传输层的*sock对象*也和*socket对象*关联起来。至此一个*socket对象*就算创建并初始化完成。
 
 
 
 ### sock_map_fd分析
 
-socket系统调用的本质就是创建一个socket内核对象，但是这个内核对象是在内核的，不能直接把这个内核对象的地址返回给用户态。我们知道Linux（或者是Unix）的哲学就是**一切皆文件**。所以socket系统调用最终会将socket内核对象以文件描述符的形式传递给用户态。[`sock_map_fd`](https://elixir.bootlin.com/linux/v4.4.302/source/net/socket.c#L392)函数就是做这个工作的。这个函数的逻辑主要分为三步：
+`socket()`系统调用的本质就是创建一个socket对象，但是内核不能直接把这个内核态的对象返回给用户态。我们知道Linux（或者是Unix）的哲学就是**一切皆文件**，所以`socket()`系统调用最终会将内核socket对象以文件描述符的形式传递给用户态，这样还有一个好处，即可以使用`read()`、`write()`等通用的文件操作。[`sock_map_fd`](https://elixir.bootlin.com/linux/v4.4.302/source/net/socket.c#L392)函数就是做这个工作的。这个函数的逻辑主要分为三步：
 
 * 申请一个新的可用fd；
 * 为struct socket分配一个struct file；
@@ -401,7 +410,9 @@ static int sock_map_fd(struct socket *sock, int flags)
 	if (unlikely(fd < 0))
 		return fd;
 
-	newfile = sock_alloc_file(sock, flags, NULL);	// 为sock分配一个strict file对象
+    // 为sock分配一个struct file对象
+    // struct file的f_op也会被设置为socket专用操作集（socket_file_ops）
+	newfile = sock_alloc_file(sock, flags, NULL);	
 	if (likely(!IS_ERR(newfile))) {
 		fd_install(fd, newfile);	// 把刚申请的fd和file对象绑定
 		return fd;
@@ -416,4 +427,20 @@ static int sock_map_fd(struct socket *sock, int flags)
 
 ## 总结
 
-通过剖析socket系统调用，我们了解了socket对象是如何创建并被初始化的。
+在 Linux 内核中，`socket()` 系统调用并不是“神秘的黑盒”，而是逐层往下、逐步构建的过程。其核心流程可以总结为：
+
+1. **参数解析与标志拆分** — 在 syscall 层处理 `type` 中的 `SOCK_CLOEXEC` 和 `SOCK_NONBLOCK` 等标志；
+2. **`sock_create()` / `__sock_create()`** — 指定网络命名空间、根据协议族选择 `net_proto_family`，并调用对应 `create` 方法；
+3. **具体协议族创建** — 比如 AF_INET 的 `inet_create()`，遍历 `inetsw` 匹配协议类型（TCP/UDP/RAW），分配 `struct sock`；
+4. **初始化与绑定** — 通过 `sock_init_data()` 将 `struct socket` 与 `struct sock` 关联并初始化各字段；
+5. **文件描述符映射** — 通过 `sock_map_fd()` 分配 fd、创建 `struct file`、将 file 和 fd 绑定，使用户态可以通过 fd 操作套接字。
+
+通过这一过程，我们能够看到几个关键的设计思想：
+
+- **对象-句柄分离**：用户态看到的只是一个整数 fd，而真正的 socket 结构体在内核中；
+- **协议层抽象与接口复用**：不同协议（TCP/UDP/RAW）共享统一的处理框架，只在 `inet_protosw` 中区别；
+- **网络命名空间隔离**：套接字从一开始就属于某个 `struct net`，支持容器、namespace 的网络隔离；
+
+掌握了这条按照层级拆解的思路，以后要深入分析更复杂的网络机制（如 `connect()`、`accept()`、`send()`/`recv()`、中断处理、TCP 状态机等）就更轻松、系统化。
+
+希望这篇剖析能帮助你揭开`socket()`系统调用的神秘面纱。
