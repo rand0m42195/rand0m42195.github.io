@@ -1,4 +1,37 @@
-<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/"><channel><title>rand0m's blog</title><link>https://rand0m42195.github.io/</link><description>Recent content on rand0m's blog</description><generator>Hugo -- 0.150.1</generator><language>zh</language><lastBuildDate>Thu, 25 Sep 2025 11:12:40 +0800</lastBuildDate><atom:link href="https://rand0m42195.github.io/index.xml" rel="self" type="application/rss+xml"/><item><title>XDP 挂载模式剖析</title><link>https://rand0m42195.github.io/posts/linux-ebpf-xdp-models/</link><pubDate>Thu, 25 Sep 2025 11:12:40 +0800</pubDate><guid>https://rand0m42195.github.io/posts/linux-ebpf-xdp-models/</guid><description>&lt;h2 id="xdp挂载模式对比"&gt;XDP挂载模式对比&lt;/h2&gt;
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/"><channel><title>rand0m's blog</title><link>https://rand0m42195.github.io/</link><description>Recent content on rand0m's blog</description><generator>Hugo -- 0.150.1</generator><language>zh</language><lastBuildDate>Fri, 26 Sep 2025 00:00:00 +0000</lastBuildDate><atom:link href="https://rand0m42195.github.io/index.xml" rel="self" type="application/rss+xml"/><item><title>Writing An Interpreter In Rust (1): 开个头</title><link>https://rand0m42195.github.io/posts/writing-an-interpreter-in-rust/</link><pubDate>Fri, 26 Sep 2025 00:00:00 +0000</pubDate><guid>https://rand0m42195.github.io/posts/writing-an-interpreter-in-rust/</guid><description>&lt;h1 id="writing-an-interpreter-in-rust-1-开个头"&gt;Writing An Interpreter In Rust (1): 开个头&lt;/h1&gt;
+&lt;p&gt;最近在读 &lt;a href="https://interpreterbook.com/"&gt;&lt;em&gt;Writing An Interpreter In Go&lt;/em&gt;&lt;/a&gt;。
+书本身挺有意思的，它带着你一步一步写一个叫 &lt;a href="https://monkeylang.org/"&gt;&lt;strong&gt;Monkey&lt;/strong&gt;&lt;/a&gt; 的小语言。
+我边看边想：既然我现在正在学 Rust，那干脆用 Rust 来实现一遍吧，当作练习。&lt;/p&gt;
+&lt;p&gt;于是就有了这个项目：
+👉 &lt;a href="https://github.com/rand0m42195/monkey-rs"&gt;GitHub: rand0m42195/monkey-rs&lt;/a&gt;&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id="为什么做这个事"&gt;为什么做这个事&lt;/h2&gt;
+&lt;ul&gt;
+&lt;li&gt;刚好最近在学rust，像用rust找点事情干；&lt;/li&gt;
+&lt;li&gt;解释器一直是我感兴趣的话题，但之前只是零散看过点原理；&lt;/li&gt;
+&lt;li&gt;用一个小项目把 Rust 和解释器放在一起，会有意思。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;hr&gt;
+&lt;h2 id="关于-monkey-语言"&gt;关于 Monkey 语言&lt;/h2&gt;
+&lt;p&gt;Monkey 是书里的示例语言。它很小，但该有的都有：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;let&lt;/code&gt; 绑定&lt;/li&gt;
+&lt;li&gt;表达式运算&lt;/li&gt;
+&lt;li&gt;条件分支&lt;/li&gt;
+&lt;li&gt;函数（而且是一等公民，可以闭包）&lt;/li&gt;
+&lt;li&gt;后面还有数组、哈希，甚至宏&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;举个简单例子：&lt;/p&gt;
+&lt;pre tabindex="0"&gt;&lt;code class="language-monkey" data-lang="monkey"&gt;let add = fn(a, b) { a + b; };
+add(2, 3); // =&amp;gt; 5
+&lt;/code&gt;&lt;/pre&gt;&lt;hr&gt;
+&lt;h2 id="我打算做什么"&gt;我打算做什么&lt;/h2&gt;
+&lt;p&gt;我的目标就是：用 Rust 写出一个能跑的 Monkey 解释器，最后能在 REPL 里玩一玩：&lt;/p&gt;
+&lt;pre tabindex="0"&gt;&lt;code&gt;&amp;gt;&amp;gt; let a = 10;
+&amp;gt;&amp;gt; let b = 20;
+&amp;gt;&amp;gt; a + b;
+30
+&lt;/code&gt;&lt;/pre&gt;&lt;p&gt;解释器的基本流程大概是这样：&lt;/p&gt;</description></item><item><title>XDP 挂载模式剖析</title><link>https://rand0m42195.github.io/posts/linux-ebpf-xdp-models/</link><pubDate>Thu, 25 Sep 2025 11:12:40 +0800</pubDate><guid>https://rand0m42195.github.io/posts/linux-ebpf-xdp-models/</guid><description>&lt;h2 id="xdp挂载模式对比"&gt;XDP挂载模式对比&lt;/h2&gt;
 &lt;p&gt;了解&lt;code&gt;XDP&lt;/code&gt;的读者应该知道：&lt;code&gt;XDP&lt;/code&gt;是基于&lt;code&gt;eBPF&lt;/code&gt;的一个高性能网络路径技术，它的原理就是在数据包处理的早期阶段（在内核网络协议栈之前）挂载&lt;code&gt;eBPF&lt;/code&gt;程序对数据包进行处理，从而实现高效的网络数据包处理。如果你写过&lt;code&gt;XDP&lt;/code&gt;程序，那么一定知道挂载&lt;code&gt;XDP&lt;/code&gt;的时候有多种模式可选，不同模式之间的效率不同。这篇文章我们就来深入剖析一下&lt;code&gt;XDP&lt;/code&gt;的集中模式之间到底有哪些区别。&lt;/p&gt;
 &lt;p&gt;首先看看&lt;code&gt;XDP&lt;/code&gt;挂载模式有哪几种？不同的挂载模式有和区别？&lt;/p&gt;
 &lt;p&gt;&lt;code&gt;XDP&lt;/code&gt;挂载模式可以以三种方式挂在到网卡上：&lt;/p&gt;
@@ -108,35 +141,5 @@ skb 被送到网络核心层，核心层通过数据包的协议类型选择对�
 &lt;/ol&gt;
 &lt;p&gt;&lt;img alt="网卡收包流程" loading="lazy" src="https://rand0m42195.github.io/images/posts/linux-networking-receive/nic-networking-stack.png"&gt;&lt;/p&gt;
 &lt;p&gt;在开始具体分析之前，先说以下相关源码的位置。和网卡相关的代码在驱动目录下（&lt;code&gt;/drivers/net/ethernet&lt;/code&gt;），由于我们分析的是Intel的e1000网卡，所以具体位置就是&lt;code&gt;/drivers/net/ethernet/intel/e1000&lt;/code&gt;，内核网络协议栈位于网络子系统目录下&lt;code&gt;/net&lt;/code&gt;，主要是&lt;code&gt;/net/core/&lt;/code&gt;目录，我们主要分析IPv4，所以还会涉及&lt;code&gt;/net/ipv4/&lt;/code&gt;中的少量代码。&lt;/p&gt;
-&lt;p&gt;接下来就以Intel e1000网卡为例，来一起探究网卡收包过程吧😀&lt;/p&gt;</description></item><item><title>用Rust实现Monkey解释器（一）</title><link>https://rand0m42195.github.io/posts/writing-an-interpreter-in-rust/</link><pubDate>Sat, 20 Sep 2025 10:45:22 +0800</pubDate><guid>https://rand0m42195.github.io/posts/writing-an-interpreter-in-rust/</guid><description>&lt;h2 id="背景"&gt;背景&lt;/h2&gt;
-&lt;p&gt;我一直对编译原理挺感兴趣，觉得编译器很神奇，所以我曾经也尝试看过编译原理的龙书，未果，也找了国内外一些高校的编译原理视频教程，最终还是没看完。感觉无论是书本还是学校的教学视频，他们都太注重理论，而很少涉及具体的代码。大概两年前，我看到了一本书——&lt;a href="https://interpreterbook.com/"&gt;&lt;code&gt;《Writing An Interpreter In Go》&lt;/code&gt;&lt;/a&gt;，看书名感觉作者在吹牛，但是还是忍不住抱着试一试的态度看了，并且跟着动手把书中的代码敲了一遍。结果还真的如书名所说，实现了一个像模像样的解释器。最让我感慨的是这本书只是用了Go语言内置的数据结构，另外只用到了标准库里的很少功能，可以说是完全从0到1自制解释器。&lt;/p&gt;
-&lt;p&gt;刚好最近学在学Rust，所以就想着用Rust把书中介绍的解释器实现一遍。最后花了几天时间用Rust写了一遍，对我个人而言还是有不少收获的：&lt;/p&gt;
-&lt;ul&gt;
-&lt;li&gt;加深了对编译器/解释器的理解；&lt;/li&gt;
-&lt;li&gt;锻炼了自己的Rust编程能力；&lt;/li&gt;
-&lt;li&gt;体会到了Rust和Go两种语言之间的差别，如错误处理、抽象、内置数据结构等；&lt;/li&gt;
-&lt;/ul&gt;
-&lt;p&gt;为了趁热打铁，我打算来写一个关于自制解释器的系列博客，就叫做&lt;code&gt;用Rust实现Monkey解释器&lt;/code&gt;。计划分为几个部分：&lt;/p&gt;
-&lt;ul&gt;
-&lt;li&gt;整体介绍，包括这个系列博客的产生背景、解释器的效果介绍；&lt;/li&gt;
-&lt;li&gt;从源码到Token：介绍词法分析器Lexer的实现；&lt;/li&gt;
-&lt;li&gt;从Token到AST：介绍语法分析器Parser的实现；&lt;/li&gt;
-&lt;li&gt;从AST到代码结果：介绍求职其Evaluator的实现；&lt;/li&gt;
-&lt;/ul&gt;
-&lt;h2 id="解释器"&gt;解释器&lt;/h2&gt;
-&lt;p&gt;首先要明确的是我们要实现的是一个&lt;strong&gt;解释器&lt;/strong&gt;，而非&lt;del&gt;编译器&lt;/del&gt;。关于解释器和编译器的区别我们这里就粗略的理解为：解释器读取源码然后解释并执行，输出结果；而编译器读取源码，将源码翻译为机器指令（即我们常见的可执行文件），但是不会执行源代码。&lt;/p&gt;
-&lt;p&gt;每种语言都有自己的解释器/编译器，这里我们要实现的是一个叫做&lt;a href="https://monkeylang.org/"&gt;&lt;code&gt;Monkey&lt;/code&gt;&lt;/a&gt;的语言的解释器。&lt;code&gt;Monkey&lt;/code&gt;语言并不是一个可用于生产环境的编程语言，它只是一个用来学习解释器/编译器的语言。下面就介绍一下&lt;code&gt;Monkey&lt;/code&gt;长什么样，它有哪些特性。&lt;/p&gt;
-&lt;p&gt;Monkey语言的语法和现代编程语言（如JavaScript、rust）很像&lt;/p&gt;
-&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"&gt;&lt;code class="language-rust" data-lang="rust"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;// Integers &amp;amp; arithmetic expressions...
-&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;let&lt;/span&gt; version &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;1&lt;/span&gt; &lt;span style="color:#f92672"&gt;+&lt;/span&gt; (&lt;span style="color:#ae81ff"&gt;50&lt;/span&gt; &lt;span style="color:#f92672"&gt;/&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;2&lt;/span&gt;) &lt;span style="color:#f92672"&gt;-&lt;/span&gt; (&lt;span style="color:#ae81ff"&gt;8&lt;/span&gt; &lt;span style="color:#f92672"&gt;*&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;3&lt;/span&gt;);
-&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;// ... and strings
-&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;let&lt;/span&gt; name &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#34;The Monkey programming language&amp;#34;&lt;/span&gt;;
-&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;// ... booleans
-&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;let&lt;/span&gt; isMonkeyFastNow &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;true&lt;/span&gt;;
-&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
-&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;// ... arrays &amp;amp; hash maps
-&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;let&lt;/span&gt; people &lt;span style="color:#f92672"&gt;=&lt;/span&gt; [{&lt;span style="color:#e6db74"&gt;&amp;#34;name&amp;#34;&lt;/span&gt;: &lt;span style="color:#e6db74"&gt;&amp;#34;Anna&amp;#34;&lt;/span&gt;, &lt;span style="color:#e6db74"&gt;&amp;#34;age&amp;#34;&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;24&lt;/span&gt;}, {&lt;span style="color:#e6db74"&gt;&amp;#34;name&amp;#34;&lt;/span&gt;: &lt;span style="color:#e6db74"&gt;&amp;#34;Bob&amp;#34;&lt;/span&gt;, &lt;span style="color:#e6db74"&gt;&amp;#34;age&amp;#34;&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;99&lt;/span&gt;}];
-&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;</description></item><item><title>About</title><link>https://rand0m42195.github.io/about/</link><pubDate>Fri, 19 Sep 2025 17:26:55 +0800</pubDate><guid>https://rand0m42195.github.io/about/</guid><description>&lt;p&gt;一枚程序员，编程语言：&lt;code&gt;C&lt;/code&gt;/&lt;code&gt;Go&lt;/code&gt;/&lt;code&gt;Rust&lt;/code&gt;，喜欢研究操作系统的底层实现以及编程语言的实现原理，还喜欢阅读和跑步。&lt;/p&gt;</description></item><item><title>First Blog</title><link>https://rand0m42195.github.io/posts/first-blog/</link><pubDate>Fri, 19 Sep 2025 17:26:03 +0800</pubDate><guid>https://rand0m42195.github.io/posts/first-blog/</guid><description>&lt;h1 id="测试"&gt;测试&lt;/h1&gt;
+&lt;p&gt;接下来就以Intel e1000网卡为例，来一起探究网卡收包过程吧😀&lt;/p&gt;</description></item><item><title>About</title><link>https://rand0m42195.github.io/about/</link><pubDate>Fri, 19 Sep 2025 17:26:55 +0800</pubDate><guid>https://rand0m42195.github.io/about/</guid><description>&lt;p&gt;一枚程序员，编程语言：&lt;code&gt;C&lt;/code&gt;/&lt;code&gt;Go&lt;/code&gt;/&lt;code&gt;Rust&lt;/code&gt;，喜欢研究操作系统的底层实现以及编程语言的实现原理，还喜欢阅读和跑步。&lt;/p&gt;</description></item><item><title>First Blog</title><link>https://rand0m42195.github.io/posts/first-blog/</link><pubDate>Fri, 19 Sep 2025 17:26:03 +0800</pubDate><guid>https://rand0m42195.github.io/posts/first-blog/</guid><description>&lt;h1 id="测试"&gt;测试&lt;/h1&gt;
 &lt;p&gt;这是第一篇博客！&lt;/p&gt;</description></item></channel></rss>
