@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/"><channel><title>Interpreter on rand0m's blog</title><link>https://rand0m42195.github.io/tags/interpreter/</link><description>Recent content in Interpreter on rand0m's blog</description><generator>Hugo -- 0.150.1</generator><language>zh</language><lastBuildDate>Sat, 20 Sep 2025 10:45:22 +0800</lastBuildDate><atom:link href="https://rand0m42195.github.io/tags/interpreter/index.xml" rel="self" type="application/rss+xml"/><item><title>用Rust实现Monkey解释器（一）</title><link>https://rand0m42195.github.io/posts/writing-an-interpreter-in-rust/</link><pubDate>Sat, 20 Sep 2025 10:45:22 +0800</pubDate><guid>https://rand0m42195.github.io/posts/writing-an-interpreter-in-rust/</guid><description>&lt;h2 id="背景"&gt;背景&lt;/h2&gt;
+&lt;p&gt;我一直对编译原理挺感兴趣，觉得编译器很神奇，所以我曾经也尝试看过编译原理的龙书，未果，也找了国内外一些高校的编译原理视频教程，最终还是没看完。感觉无论是书本还是学校的教学视频，他们都太注重理论，而很少涉及具体的代码。大概两年前，我看到了一本书——&lt;a href="https://interpreterbook.com/"&gt;&lt;code&gt;《Writing An Interpreter In Go》&lt;/code&gt;&lt;/a&gt;，看书名感觉作者在吹牛，但是还是忍不住抱着试一试的态度看了，并且跟着动手把书中的代码敲了一遍。结果还真的如书名所说，实现了一个像模像样的解释器。最让我感慨的是这本书只是用了Go语言内置的数据结构，另外只用到了标准库里的很少功能，可以说是完全从0到1自制解释器。&lt;/p&gt;
+&lt;p&gt;刚好最近学在学Rust，所以就想着用Rust把书中介绍的解释器实现一遍。最后花了几天时间用Rust写了一遍，对我个人而言还是有不少收获的：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;加深了对编译器/解释器的理解；&lt;/li&gt;
+&lt;li&gt;锻炼了自己的Rust编程能力；&lt;/li&gt;
+&lt;li&gt;体会到了Rust和Go两种语言之间的差别，如错误处理、抽象、内置数据结构等；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;为了趁热打铁，我打算来写一个关于自制解释器的系列博客，就叫做&lt;code&gt;用Rust实现Monkey解释器&lt;/code&gt;。计划分为几个部分：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;整体介绍，包括这个系列博客的产生背景、解释器的效果介绍；&lt;/li&gt;
+&lt;li&gt;从源码到Token：介绍词法分析器Lexer的实现；&lt;/li&gt;
+&lt;li&gt;从Token到AST：介绍语法分析器Parser的实现；&lt;/li&gt;
+&lt;li&gt;从AST到代码结果：介绍求职其Evaluator的实现；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2 id="解释器"&gt;解释器&lt;/h2&gt;
+&lt;p&gt;首先要明确的是我们要实现的是一个&lt;strong&gt;解释器&lt;/strong&gt;，而非&lt;del&gt;编译器&lt;/del&gt;。关于解释器和编译器的区别我们这里就粗略的理解为：解释器读取源码然后解释并执行，输出结果；而编译器读取源码，将源码翻译为机器指令（即我们常见的可执行文件），但是不会执行源代码。&lt;/p&gt;
+&lt;p&gt;每种语言都有自己的解释器/编译器，这里我们要实现的是一个叫做&lt;a href="https://monkeylang.org/"&gt;&lt;code&gt;Monkey&lt;/code&gt;&lt;/a&gt;的语言的解释器。&lt;code&gt;Monkey&lt;/code&gt;语言并不是一个可用于生产环境的编程语言，它只是一个用来学习解释器/编译器的语言。下面就介绍一下&lt;code&gt;Monkey&lt;/code&gt;长什么样，它有哪些特性。&lt;/p&gt;
+&lt;p&gt;Monkey语言的语法和现代编程语言（如JavaScript、rust）很像&lt;/p&gt;
+&lt;div class="highlight"&gt;&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"&gt;&lt;code class="language-rust" data-lang="rust"&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;// Integers &amp;amp; arithmetic expressions...
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;let&lt;/span&gt; version &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;1&lt;/span&gt; &lt;span style="color:#f92672"&gt;+&lt;/span&gt; (&lt;span style="color:#ae81ff"&gt;50&lt;/span&gt; &lt;span style="color:#f92672"&gt;/&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;2&lt;/span&gt;) &lt;span style="color:#f92672"&gt;-&lt;/span&gt; (&lt;span style="color:#ae81ff"&gt;8&lt;/span&gt; &lt;span style="color:#f92672"&gt;*&lt;/span&gt; &lt;span style="color:#ae81ff"&gt;3&lt;/span&gt;);
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;// ... and strings
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;let&lt;/span&gt; name &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#e6db74"&gt;&amp;#34;The Monkey programming language&amp;#34;&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;// ... booleans
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;let&lt;/span&gt; isMonkeyFastNow &lt;span style="color:#f92672"&gt;=&lt;/span&gt; &lt;span style="color:#66d9ef"&gt;true&lt;/span&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;// ... arrays &amp;amp; hash maps
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span style="display:flex;"&gt;&lt;span&gt;&lt;span style="color:#75715e"&gt;&lt;/span&gt;&lt;span style="color:#66d9ef"&gt;let&lt;/span&gt; people &lt;span style="color:#f92672"&gt;=&lt;/span&gt; [{&lt;span style="color:#e6db74"&gt;&amp;#34;name&amp;#34;&lt;/span&gt;: &lt;span style="color:#e6db74"&gt;&amp;#34;Anna&amp;#34;&lt;/span&gt;, &lt;span style="color:#e6db74"&gt;&amp;#34;age&amp;#34;&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;24&lt;/span&gt;}, {&lt;span style="color:#e6db74"&gt;&amp;#34;name&amp;#34;&lt;/span&gt;: &lt;span style="color:#e6db74"&gt;&amp;#34;Bob&amp;#34;&lt;/span&gt;, &lt;span style="color:#e6db74"&gt;&amp;#34;age&amp;#34;&lt;/span&gt;: &lt;span style="color:#ae81ff"&gt;99&lt;/span&gt;}];
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;</description></item></channel></rss>
