@@ -1,7 +1,9 @@
 +++
 date = '2025-10-14T06:39:46+08:00'
-draft = true
+draft = false
 title = 'Go Testing'
+comments = true
+tags = ["Go", "Testing", "Fuzzing"]
 +++
 
 # TL; DR
