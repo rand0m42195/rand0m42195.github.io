@@ -1,14 +1,13 @@
 +++
 date = '2025-10-14T07:55:34+08:00'
 draft = false
-title = 'Go Pitfall Guide'
+title = 'Go语言常见错误分析'
 comments = true
 tags = ["Go", "Bug"]
 +++
 
-### Lets's Go 之 避坑指南
 
-Hello，欢迎来到我的Go语言学习笔记，这一篇我们一起来看看Go语言中一些常见错误，以及一些容易被人误解的地方。（另外，也欢大家迎浏览我的上一篇笔记：[Go Testing](https://rand0m42195.github.io/posts/go-testing/)😀）
+Hello，欢迎来到我的Go语言学习笔记，这一篇我们一起来看看Go语言中一些常见错误，以及一些容易被人误解的地方。（另外，也欢大家迎浏览我的上一篇笔记：[详解Go Testing](https://rand0m42195.github.io/posts/go-testing/)😀）
 
 为了突出问题，下面举的某些例子可能比较极端，还望大家不要纠结例子的使用场景，明白其中的错误原因即可。另外，欢迎大家补充示例🫵。
 

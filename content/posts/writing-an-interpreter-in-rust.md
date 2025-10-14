@@ -1,10 +1,10 @@
 +++
- title = "Writing An Interpreter In Rust (1): 开个头"
+ title = "Writing An Interpreter In Rust (1)"
  date = 2025-09-26
  draft = false
 +++
 
-# Writing An Interpreter In Rust (1): 开个头
+# Writing An Interpreter In Rust (1)
 
 最近在读 [*Writing An Interpreter In Go*](https://interpreterbook.com/)。
  书本身挺有意思的，它带着你一步一步写一个叫 [**Monkey**](https://monkeylang.org/) 的小语言。
@@ -74,10 +74,3 @@ add(2, 3);  // => 5
 
 ------
 
-## 先到这
-
-这一篇就当一个 flag，算是对自己说：
-
-> 这事儿要好好做，别半途而废。
-
-下一篇就从 **lexer** 开始写起。
