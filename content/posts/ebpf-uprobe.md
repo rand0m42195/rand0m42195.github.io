@@ -387,6 +387,14 @@ Goroutine ID    Old Status           New Status
 
 
 
+PS：在确认了Go的传参规范和Linux的传参规范不一样之后，去搜了一下相关文档，还真的有文档介绍较新版本的Go在amd64架构下的传参[约定](https://go.googlesource.com/go/+/refs/heads/dev.regabi/src/cmd/compile/internal-abi.md#amd64-architecture)。对于整形的参数和结果，Go使用一下寄存器进行传递。这个通过反汇编观察到的结论一致。
+
+```bash
+RAX, RBX, RCX, RDI, RSI, R8, R9, R10, R11
+```
+
+
+
 ## 总结
 
 使用cilium/ebpf开发uprobe分为几个部分：
